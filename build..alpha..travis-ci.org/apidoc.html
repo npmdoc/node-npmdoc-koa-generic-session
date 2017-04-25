@@ -49,6 +49,8 @@
 <h1>api documentation for
     <a
 
+        href="https://github.com/koajs/generic-session#readme"
+
     >koa-generic-session (v1.11.5)</a>
 </h1>
 <h4>koa generic session store by memory, redis or others</h4>
@@ -79,8 +81,8 @@
 
         <li>
 
-            <a class="apidocElementLiA" href="#apidoc.element.koa-generic-session.session">
-            function <span class="apidocSignatureSpan">koa-generic-session.</span>session
+            <a class="apidocElementLiA" href="#apidoc.element.koa-generic-session.index">
+            function <span class="apidocSignatureSpan">koa-generic-session.</span>index
             <span class="apidocSignatureSpan">(options)</span>
             </a>
 
@@ -153,12 +155,12 @@
 
     </ol></li>
 
-    <li class="apidocModuleLi"><a href="#apidoc.module.koa-generic-session.session">module koa-generic-session.session</a><ol>
+    <li class="apidocModuleLi"><a href="#apidoc.module.koa-generic-session.index">module koa-generic-session.index</a><ol>
 
         <li>
 
-            <a class="apidocElementLiA" href="#apidoc.element.koa-generic-session.session.session">
-            function <span class="apidocSignatureSpan">koa-generic-session.</span>session
+            <a class="apidocElementLiA" href="#apidoc.element.koa-generic-session.index.index">
+            function <span class="apidocSignatureSpan">koa-generic-session.</span>index
             <span class="apidocSignatureSpan">(options)</span>
             </a>
 
@@ -166,8 +168,8 @@
 
         <li>
 
-            <a class="apidocElementLiA" href="#apidoc.element.koa-generic-session.session.MemoryStore">
-            function <span class="apidocSignatureSpan">koa-generic-session.session.</span>MemoryStore
+            <a class="apidocElementLiA" href="#apidoc.element.koa-generic-session.index.MemoryStore">
+            function <span class="apidocSignatureSpan">koa-generic-session.index.</span>MemoryStore
             <span class="apidocSignatureSpan">()</span>
             </a>
 
@@ -419,13 +421,13 @@
 
 
     <h2>
-        <a href="#apidoc.element.koa-generic-session.session" id="apidoc.element.koa-generic-session.session">
-        function <span class="apidocSignatureSpan">koa-generic-session.</span>session
+        <a href="#apidoc.element.koa-generic-session.index" id="apidoc.element.koa-generic-session.index">
+        function <span class="apidocSignatureSpan">koa-generic-session.</span>index
         <span class="apidocSignatureSpan">(options)</span>
         </a>
     </h2>
     <ul>
-    <li>description and source-code<pre class="apidocCodePre">session = function (options) {
+    <li>description and source-code<pre class="apidocCodePre">index = function (options) {
   options = options || {};
   let key = options.key || &#x27;koa.sid&#x27;;
   let client = options.store || new MemoryStore();
@@ -651,18 +653,21 @@
   delete this.sessions[sid];
 }</pre></li>
     <li>example usage<pre class="apidocCodePre">...
-  yield this.client.set(sid, sess, ttl);
-  debug(&#x27;SET complete&#x27;);
-};
+}
 
-Store.prototype.destroy = function *(sid) {
-  sid = this.options.prefix + sid;
-  debug(&#x27;DEL %s&#x27;, sid);
-  yield this.client.<span class="apidocCodeKeywordSpan">destroy</span>(sid);
-  debug(&#x27;DEL %s complete&#x27;, sid);
-};
+//delete session
+if (!session) {
+  if (!isNew) {
+    debug(&#x27;session set to null, destroy session: %s&#x27;, this.sessionId);
+    sessionIdStore.reset.call(this);
+    return yield store.<span class="apidocCodeKeywordSpan">destroy</span>(this.sessionId);
+  }
+  return debug(&#x27;a new session and set to null, ignore destroy&#x27;);
+}
 
-module.exports = Store;
+// force saving non-empty session
+if(this._sessionSave === true) {
+  debug(&#x27;session save forced&#x27;);
 ...</pre></li>
     </ul>
 
@@ -680,21 +685,21 @@ module.exports = Store;
   return this.sessions[sid];
 }</pre></li>
     <li>example usage<pre class="apidocCodePre">...
+  // meant for a production environment
+  if (&#x27;production&#x27; === process.env.NODE_ENV
+   &#x26;&#x26; client instanceof MemoryStore) console.warn(warning);
 
-util.inherits(Store, EventEmitter);
+  let sessionIdStore = options.sessionIdStore || {
 
-Store.prototype.get = function *(sid) {
-var data;
-sid = this.options.prefix + sid;
-debug(&#x27;GET %s&#x27;, sid);
-data = yield this.client.<span class="apidocCodeKeywordSpan">get</span>(sid);
-if (!data) {
-  debug(&#x27;GET empty&#x27;);
-  return null;
-}
-if (data &#x26;&#x26; data.cookie &#x26;&#x26; typeof data.cookie.expires === &#x27;string&#x27;) {
-  // make sure data.cookie.expires is a Date
-  data.cookie.expires = new Date(data.cookie.expires);
+get: function() {
+  return this.cookies.<span class="apidocCodeKeywordSpan">get</span>(key, cookie);
+},
+
+set: function(sid, session) {
+  this.cookies.set(key, sid, session.cookie);
+},
+
+reset: function() {
 ...</pre></li>
     </ul>
 
@@ -712,21 +717,20 @@ if (data &#x26;&#x26; data.cookie &#x26;&#x26; typeof data.cookie.expires === &#
   this.sessions[sid] = val;
 }</pre></li>
     <li>example usage<pre class="apidocCodePre">...
-  if (sess.cookie &#x26;&#x26; sess.cookie.expires) {
-    ttl = Math.ceil(sess.cookie.expires.getTime() - Date.now());
+let sessionIdStore = options.sessionIdStore || {
+
+  get: function() {
+    return this.cookies.get(key, cookie);
+  },
+
+  set: function(sid, session) {
+    this.cookies.<span class="apidocCodeKeywordSpan">set</span>(key, sid, session.cookie);
+  },
+
+  reset: function() {
+    this.cookies.set(key, null);
   }
-}
-
-sid = this.options.prefix + sid;
-debug(&#x27;SET key: %s, value: %s, ttl: %d&#x27;, sid, sess, ttl);
-yield this.client.<span class="apidocCodeKeywordSpan">set</span>(sid, sess, ttl);
-debug(&#x27;SET complete&#x27;);
 };
-
-Store.prototype.destroy = function *(sid) {
-sid = this.options.prefix + sid;
-debug(&#x27;DEL %s&#x27;, sid);
-yield this.client.destroy(sid);
 ...</pre></li>
     </ul>
 
@@ -734,17 +738,17 @@ yield this.client.destroy(sid);
 </div>
 
 <div class="apidocSectionDiv">
-<h1><a href="#apidoc.module.koa-generic-session.session" id="apidoc.module.koa-generic-session.session">module koa-generic-session.session</a></h1>
+<h1><a href="#apidoc.module.koa-generic-session.index" id="apidoc.module.koa-generic-session.index">module koa-generic-session.index</a></h1>
 
 
     <h2>
-        <a href="#apidoc.element.koa-generic-session.session.session" id="apidoc.element.koa-generic-session.session.session">
-        function <span class="apidocSignatureSpan">koa-generic-session.</span>session
+        <a href="#apidoc.element.koa-generic-session.index.index" id="apidoc.element.koa-generic-session.index.index">
+        function <span class="apidocSignatureSpan">koa-generic-session.</span>index
         <span class="apidocSignatureSpan">(options)</span>
         </a>
     </h2>
     <ul>
-    <li>description and source-code<pre class="apidocCodePre">session = function (options) {
+    <li>description and source-code<pre class="apidocCodePre">index = function (options) {
   options = options || {};
   let key = options.key || &#x27;koa.sid&#x27;;
   let client = options.store || new MemoryStore();
@@ -907,8 +911,8 @@ yield this.client.destroy(sid);
 
 
     <h2>
-        <a href="#apidoc.element.koa-generic-session.session.MemoryStore" id="apidoc.element.koa-generic-session.session.MemoryStore">
-        function <span class="apidocSignatureSpan">koa-generic-session.session.</span>MemoryStore
+        <a href="#apidoc.element.koa-generic-session.index.MemoryStore" id="apidoc.element.koa-generic-session.index.MemoryStore">
+        function <span class="apidocSignatureSpan">koa-generic-session.index.</span>MemoryStore
         <span class="apidocSignatureSpan">()</span>
         </a>
     </h2>
@@ -984,18 +988,21 @@ yield this.client.destroy(sid);
   debug(&#x27;DEL %s complete&#x27;, sid);
 }</pre></li>
     <li>example usage<pre class="apidocCodePre">...
-  yield this.client.set(sid, sess, ttl);
-  debug(&#x27;SET complete&#x27;);
-};
+}
 
-Store.prototype.destroy = function *(sid) {
-  sid = this.options.prefix + sid;
-  debug(&#x27;DEL %s&#x27;, sid);
-  yield this.client.<span class="apidocCodeKeywordSpan">destroy</span>(sid);
-  debug(&#x27;DEL %s complete&#x27;, sid);
-};
+//delete session
+if (!session) {
+  if (!isNew) {
+    debug(&#x27;session set to null, destroy session: %s&#x27;, this.sessionId);
+    sessionIdStore.reset.call(this);
+    return yield store.<span class="apidocCodeKeywordSpan">destroy</span>(this.sessionId);
+  }
+  return debug(&#x27;a new session and set to null, ignore destroy&#x27;);
+}
 
-module.exports = Store;
+// force saving non-empty session
+if(this._sessionSave === true) {
+  debug(&#x27;session save forced&#x27;);
 ...</pre></li>
     </ul>
 
@@ -1025,21 +1032,21 @@ module.exports = Store;
   return data;
 }</pre></li>
     <li>example usage<pre class="apidocCodePre">...
+  // meant for a production environment
+  if (&#x27;production&#x27; === process.env.NODE_ENV
+   &#x26;&#x26; client instanceof MemoryStore) console.warn(warning);
 
-util.inherits(Store, EventEmitter);
+  let sessionIdStore = options.sessionIdStore || {
 
-Store.prototype.get = function *(sid) {
-var data;
-sid = this.options.prefix + sid;
-debug(&#x27;GET %s&#x27;, sid);
-data = yield this.client.<span class="apidocCodeKeywordSpan">get</span>(sid);
-if (!data) {
-  debug(&#x27;GET empty&#x27;);
-  return null;
-}
-if (data &#x26;&#x26; data.cookie &#x26;&#x26; typeof data.cookie.expires === &#x27;string&#x27;) {
-  // make sure data.cookie.expires is a Date
-  data.cookie.expires = new Date(data.cookie.expires);
+get: function() {
+  return this.cookies.<span class="apidocCodeKeywordSpan">get</span>(key, cookie);
+},
+
+set: function(sid, session) {
+  this.cookies.set(key, sid, session.cookie);
+},
+
+reset: function() {
 ...</pre></li>
     </ul>
 
@@ -1071,21 +1078,20 @@ if (data &#x26;&#x26; data.cookie &#x26;&#x26; typeof data.cookie.expires === &#
   debug(&#x27;SET complete&#x27;);
 }</pre></li>
     <li>example usage<pre class="apidocCodePre">...
-  if (sess.cookie &#x26;&#x26; sess.cookie.expires) {
-    ttl = Math.ceil(sess.cookie.expires.getTime() - Date.now());
+let sessionIdStore = options.sessionIdStore || {
+
+  get: function() {
+    return this.cookies.get(key, cookie);
+  },
+
+  set: function(sid, session) {
+    this.cookies.<span class="apidocCodeKeywordSpan">set</span>(key, sid, session.cookie);
+  },
+
+  reset: function() {
+    this.cookies.set(key, null);
   }
-}
-
-sid = this.options.prefix + sid;
-debug(&#x27;SET key: %s, value: %s, ttl: %d&#x27;, sid, sess, ttl);
-yield this.client.<span class="apidocCodeKeywordSpan">set</span>(sid, sess, ttl);
-debug(&#x27;SET complete&#x27;);
 };
-
-Store.prototype.destroy = function *(sid) {
-sid = this.options.prefix + sid;
-debug(&#x27;DEL %s&#x27;, sid);
-yield this.client.destroy(sid);
 ...</pre></li>
     </ul>
 
